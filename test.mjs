@@ -24,9 +24,11 @@ function assert(cond, label) {
   }
 }
 
-// Extract text the same way the browser does, via vendored pdf.js.
-const pdfjs = await import(path.join(dir, "vendor", "pdf.min.mjs"));
-pdfjs.GlobalWorkerOptions.workerSrc = path.join(dir, "vendor", "pdf.worker.min.mjs");
+// Extract text the same way the browser does, but via the LEGACY pdf.js build:
+// the modern build needs Promise.withResolvers (Node 22+ / modern browsers),
+// and tests must also pass on Node 20 (CI's floor).
+const pdfjs = await import(path.join(dir, "vendor", "legacy", "pdf.min.mjs"));
+pdfjs.GlobalWorkerOptions.workerSrc = path.join(dir, "vendor", "legacy", "pdf.worker.min.mjs");
 
 async function extract(file) {
   const data = new Uint8Array(readFileSync(file));

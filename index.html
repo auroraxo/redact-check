@@ -6,6 +6,17 @@
 <title>Redact Check — verify your PDF redaction actually removed the text</title>
 <meta name="description" content="Free, private, in-browser checker. A black box over text in a PDF is not a redaction — the text underneath is still copy-pasteable. Drop your PDF in and see what is really still there.">
 <meta name="color-scheme" content="dark">
+<script>
+// pdf.js 4.x needs Promise.withResolvers (2024 browsers). Tiny polyfill so the
+// page still works on older engines. Must run before the module below.
+if (typeof Promise.withResolvers !== "function") {
+  Promise.withResolvers = function () {
+    let resolve, reject;
+    const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+    return { promise, resolve, reject };
+  };
+}
+</script>
 <meta property="og:title" content="Redact Check — is your PDF redaction real?">
 <meta property="og:description" content="Black-box redactions fail in court. Check yours in seconds, without uploading anything.">
 <meta property="og:type" content="website">
