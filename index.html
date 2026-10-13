@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Redact Check — verify your PDF redaction actually removed the text</title>
+<meta name="description" content="Free, private, in-browser checker. A black box over text in a PDF is not a redaction — the text underneath is still copy-pasteable. Drop your PDF in and see what is really still there.">
+<meta name="color-scheme" content="dark">
+<meta property="og:title" content="Redact Check — is your PDF redaction real?">
+<meta property="og:description" content="Black-box redactions fail in court. Check yours in seconds, without uploading anything.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230d1117'/><rect x='14' y='38' width='72' height='24' rx='4' fill='%23f85149'/></svg>">
+<style>
+:root {
+  --bg: #0d1117;
+  --panel: #161b22;
+  --border: #30363d;
+  --text: #e6edf3;
+  --muted: #8b949e;
+  --accent: #58a6ff;
+  --red: #f85149;
+  --green: #3fb950;
+  --amber: #d29922;
+}
+* { box-sizing: border-box; }
+html { background: var(--bg); }
+body {
+  margin: 0;
+  font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+.wrap { max-width: 880px; margin: 0 auto; padding: 32px 20px 80px; }
+header h1 {
+  font-size: 28px;
+  margin: 0 0 4px;
+  letter-spacing: -0.5px;
+}
+header h1 .box {
+  display: inline-block;
+  width: 26px; height: 12px;
+  background: var(--red);
+  border-radius: 2px;
+  vertical-align: 6px;
+  margin-right: 8px;
+}
+.tagline { color: var(--muted); margin: 0 0 8px; }
+.privacy {
+  display: inline-block;
+  font-size: 13px;
+  color: var(--green);
+  border: 1px solid #238636;
+  background: #0f2e1a;
+  border-radius: 999px;
+  padding: 3px 12px;
+  margin-bottom: 20px;
+}
+h2 { font-size: 18px; margin: 36px 0 10px; }
+p.lead { color: var(--muted); }
+
+#drop {
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  padding: 34px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+#drop.over, #drop:hover { border-color: var(--accent); }
+#drop .big { font-size: 17px; font-weight: 600; }
+#drop .sub { color: var(--muted); font-size: 14px; margin-top: 6px; }
+#file { display: none; }
+#file-name { display: block; margin-top: 10px; color: var(--accent); font-size: 14px; }
+
+textarea {
+  width: 100%;
+  min-height: 110px;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  resize: vertical;
+}
+textarea:focus { outline: none; border-color: var(--accent); }
+
+button {
+  font: 600 15px/1 inherit;
+  padding: 12px 22px;
+  border-radius: 8px;
+  border: 1px solid #238636;
+  background: #238636;
+  color: #fff;
+  cursor: pointer;
+  margin-top: 12px;
+}
+button:hover:not(:disabled) { background: #2ea043; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+
+#progress { margin-top: 14px; }
+#bar-track { height: 8px; background: var(--panel); border: 1px solid var(--border); border-radius: 999px; overflow: hidden; }
+#bar { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+#progress-label { font-size: 13px; color: var(--muted); margin-top: 5px; }
+
+#error {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--red);
+  background: #2d1214;
+  border-radius: 8px;
+  color: #ffa198;
+}
+
+.verdict {
+  margin-top: 24px;
+  padding: 16px 18px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+}
+.verdict strong { font-size: 18px; display: block; margin-bottom: 6px; }
+.verdict p { margin: 0; color: var(--muted); font-size: 15px; }
+.verdict.bad { border-color: var(--red); background: #25171c; }
+.verdict.bad strong { color: var(--red); }
+.verdict.good { border-color: var(--green); background: #12241a; }
+.verdict.good strong { color: var(--green); }
+.verdict.neutral strong { color: var(--amber); }
+
+table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; font-size: 13px; }
+code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; color: #79c0ff; }
+.pill {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+.pill.danger { background: #da3633; color: #fff; }
+.pill.ok { background: #238636; color: #fff; }
+.ok { color: var(--green); }
+.hit { margin-top: 6px; font-size: 13px; }
+.hit .page {
+  background: var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 11px;
+  color: var(--muted);
+  margin-right: 6px;
+}
+.hit .snippet { color: var(--text); }
+mark { background: #7d3d16; color: #ffd8b4; border-radius: 2px; padding: 0 2px; }
+
+details { border: 1px solid var(--border); border-radius: 8px; margin-top: 8px; background: var(--panel); }
+details summary { cursor: pointer; padding: 10px 14px; font-weight: 600; font-size: 14px; }
+details pre {
+  margin: 0;
+  padding: 12px 14px;
+  border-top: 1px solid var(--border);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--muted);
+  max-height: 400px;
+  overflow: auto;
+}
+
+.notice {
+  border: 1px solid var(--amber);
+  background: #242013;
+  color: #e3b341;
+  padding: 12px 14px;
+  border-radius: 8px;
+  margin-top: 14px;
+  font-size: 14px;
+}
+
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; }
+.card h3 { margin: 0 0 8px; font-size: 15px; }
+.card p, .card li { font-size: 14px; color: var(--muted); margin: 6px 0; }
+.card ul { padding-left: 18px; margin: 6px 0; }
+
+footer { margin-top: 56px; border-top: 1px solid var(--border); padding-top: 20px; color: var(--muted); font-size: 14px; }
+footer a { color: var(--accent); }
+footer p { margin: 8px 0; }
+.disclaimer { font-size: 13px; color: var(--muted); }
+body.busy { cursor: progress; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1><span class="box"></span>Redact Check</h1>
+  <p class="tagline">A black box over text in a PDF is not a redaction. The text underneath is still copy-pasteable — and courts have sanctioned lawyers for exactly that. Check your file before you file it.</p>
+  <span class="privacy">✓ 100% in your browser — your file is never uploaded</span>
+</header>
+
+<div id="drop" tabindex="0" role="button" aria-label="Choose a PDF file">
+  <div class="big">Drop a PDF here, or click to choose</div>
+  <div class="sub">Read-only analysis. Nothing is sent anywhere.</div>
+  <span id="file-name" hidden></span>
+</div>
+<input type="file" id="file" accept="application/pdf,.pdf">
+
+<div id="progress" hidden>
+  <div id="bar-track"><div id="bar"></div></div>
+  <div id="progress-label"></div>
+</div>
+
+<div id="error" hidden></div>
+
+<h2>1. What were you trying to redact?</h2>
+<p class="lead">Paste each value you tried to hide — SSN, name, account number, address — one per line. Then run the check.</p>
+<textarea id="terms" placeholder="123-45-6789&#10;jane.doe@example.com&#10;42 Wallaby Way"></textarea>
+<button id="run" disabled>Verify redaction</button>
+
+<div id="verdict" hidden></div>
+
+<div id="terms-result" hidden>
+  <h2>Term-by-term result</h2>
+  <table>
+    <thead><tr><th>Term</th><th>Result</th><th>Where it was found</th></tr></thead>
+    <tbody id="terms-body"></tbody>
+  </table>
+</div>
+
+<div id="pii-result" hidden>
+  <h2>Automatic scan — PII-shaped strings in the text layer</h2>
+  <p class="lead">Runs whether or not you entered terms. SSN-, email- and valid card-number-shaped strings found anywhere in extractable text:</p>
+  <table>
+    <thead><tr><th>Type</th><th>Value</th><th>Found on</th></tr></thead>
+    <tbody id="pii-body"></tbody>
+  </table>
+</div>
+
+<div id="scanned-warning" class="notice" hidden>
+  This PDF has little or no text layer — it looks like a scan or image-only file. Text-level checks cannot see inside images. If someone redacted by drawing boxes on a scan, the boxes are pixels: that <em>is</em> effective for text extraction, but OCR can sometimes recover it.
+</div>
+
+<div id="extracted" hidden>
+  <h2>Extracted text by page <button id="show-extracted" style="font-size:12px;padding:4px 10px;margin:0 0 0 8px;vertical-align:middle">reload</button></h2>
+  <p class="lead">This is everything a stranger can copy out of your file. Read it before you send it.</p>
+  <div id="extracted-text"></div>
+</div>
+
+<div id="file-info-wrap" hidden></div>
+
+<h2>Why this exists</h2>
+<div class="grid">
+  <div class="card">
+    <h3>The failure mode</h3>
+    <p>Drawing a rectangle or a black box over text hides it visually. The bytes stay in the file. Press <em>Select All</em>, copy, or run <code>pdftotext</code> — the "redacted" text comes right back.</p>
+    <p>It has happened to professionals with real stakes: black-box redactions were reversed by copy-paste in <em>Apple v. Samsung</em>, in Meta's 2025 FTC antitrust filings (journalists recovered data about Apple, Snap and Google), and in court filings that drew sanctions — one Florida firm was reportedly fined <strong>$30,000</strong>.</p>
+  </div>
+  <div class="card">
+    <h3>Who needs this</h3>
+    <ul>
+      <li>Solo &amp; small-firm lawyers and paralegals filing exhibits</li>
+      <li>HR sending redacted personnel records</li>
+      <li>Journalists protecting sources</li>
+      <li>Accountants, clinics, contractors sharing client PII</li>
+      <li>Anyone responding to a discovery or FOIA request</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>What it costs today</h3>
+    <ul>
+      <li><strong>$19.99/mo</strong> — Adobe Acrobat Pro, the plan that ships a proper redaction tool</li>
+      <li><strong>Free-but-failing</strong> tools that just draw boxes over your data</li>
+      <li><strong>$30,000+</strong> — reported sanction for filing ineffective redactions</li>
+      <li><strong>Unbounded</strong> — a leaked SSN or source in a public filing</li>
+    </ul>
+  </div>
+</div>
+
+<h2>Limitations — read before you rely on this</h2>
+<div class="card">
+  <ul>
+    <li><strong>Text only.</strong> This checks the text layer, metadata, and raw file bytes. It cannot see inside images or scanned pages.</li>
+    <li><strong>"Not found" is strong evidence, not proof.</strong> Exotic encodings or OCR-only content can hide strings from any extractor. For court-level assurance, also open the file, Select All, and try to copy the redacted area.</li>
+    <li><strong>Not legal advice.</strong> Rules differ by court and jurisdiction (e.g. the <a href="https://www.uscourts.gov/sites/mnd/files/Best_Practices-Redaction_of_Information.pdf" style="color:var(--accent)">District of Minnesota's redaction best practices</a> and the <a href="https://www.uscfc.uscourts.gov/sites/cfc/files/pdf_file_redaction_best_practices.pdf" style="color:var(--accent)">US Court of Federal Claims guidance</a>).</li>
+    <li><strong>Real redaction means deleting content</strong>, not covering it. If this tool says FAIL, rebuild the page or use a tool that removes the text (Acrobat's <em>Redact</em> panel, or rasterize the page to an image).</li>
+  </ul>
+</div>
+
+<footer>
+  <p><strong>Redact Check</strong> — free, open source, MIT licensed. <a href="https://github.com/auroraxo/redact-check">github.com/auroraxo/redact-check</a></p>
+  <p>Built by <a href="https://codebyaurora.com">codebyaurora.com</a>. Parsing by <a href="https://mozilla.github.io/pdf.js/">Mozilla pdf.js</a>; the library is vendored, so the page works even if that CDN disappears.</p>
+  <p class="disclaimer">Provided as-is, without warranty. You are responsible for verifying redactions before filing or publishing.</p>
+</footer>
+
+</div>
+<script type="module" src="./app.js"></script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "name": "redact-check",
+  "version": "0.1.0",
+  "description": "Client-side verifier: is the text under your PDF redaction really gone?",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "test": "node test.mjs",
+    "fixtures": "python3 gen_fixtures.py"
+  }
+}
